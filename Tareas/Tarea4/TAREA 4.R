@@ -220,6 +220,14 @@ flights |>
 planes |>
   select(tailnum)
 
+tail_numbers <- flights |> 
+  anti_join(planes, join_by(tailnum)) |> 
+  count(carrier) |> 
+  arrange(desc(n))
+
+#vemos que hay una relacion entre las aerolines MQ y AA, son los que tienen la mayor cantidad de vuelos cuyos tailnum no esatn registrados en la tabla planes, puede esto explicar que la variable CARRIER explica casi todo el problema
+
+
 
 #EJERCICIO 5
 #Añade una columna que liste todos los que han volado ese avión. Podrías esperar que haya una relación implícita entre avión y aerolínea, porque cada avión es operado por una sola aerolínea. Confirma o rechaza esta hipótesis usando las herramientas que has aprendido en capítulos anteriores.planescarrier
@@ -227,7 +235,97 @@ planes |>
 
 
 planes_carrier <- flights |>
-  filter(!is.na(tailnum)) |>   #filtrar los vuelos que no tinenn falta numero de avion
-  distinct(tailnum, carrier)   #
+  select(tailnum, carrier) |>
+  distinct() |>
+  group_by(tailnum) |>
+  mutate(n = n()) |>
+  filter(n > 1)
 
 
+#vemos que hay aviones que han volado para mas de una aerolinea, por ende podriamos afirmar la hipotesis dad
+
+
+
+#EJERCICIO 6
+#Suma la latitud y la longitud del aeropuerto de origen y destino a . ¿Es más fácil renombrar las columnas antes o después de unirse?flights
+
+airports
+
+flights
+
+
+#renombramos lat, lon en base al origen, tomando como referencia los aeropuertos
+airports_origin <- airports |>
+  rename(
+    origin = faa,
+    origin_lat = lat,
+    origin_lon = lon
+  )
+#renombramos lat, lon en base al destino, tomando como referencia los aeropuertos
+airports_dest <- airports |>
+  rename(
+    dest = faa,
+    dest_lat = lat,
+    dest_lon = lon
+  )
+
+#Unimos las tablas
+flights2 <- flights |>
+  left_join(airports_origin, by = "origin") |>
+  left_join(airports_dest, by = "dest")
+
+
+
+
+#EJERCICIO 7
+#Calcula el retardo medio por destino y luego únete en el marco de datos para poder mostrar la distribución espacial de los retrasos. Aquí tienes una forma sencilla de dibujar un mapa de Estados Unidos:airports
+
+airports |>
+  semi_join(flights, join_by(faa == dest)) |>
+  ggplot(aes(x = lon, y = lat)) +
+  borders("state") +
+  geom_point() +
+  coord_quickmap()
+
+#Quizá quieras usar el or de los puntos para mostrar el retraso medio de cada aeropuerto.sizecolor
+
+
+retraso_promedio_dest<- flights |> 
+  group_by(dest) |> 
+  summarize(promedio_retraso=mean(arr_delay,na.rm=TRUE))
+
+mapa <- airports |>
+  left_join(retraso_promedio_dest, join_by(faa == dest)) |>
+  ggplot(aes(x = lon, y = lat)) +
+  borders("state") +
+  geom_point(aes(color=promedio_retraso)) +
+  coord_quickmap()
+
+
+mapa
+
+
+
+#EJERCICIO 8
+#¿Qué ocurrió el 13 de junio de 2013? Dibuja un mapa de los retrasos y luego usa Google para cruzar con el tiempo.
+
+
+
+retraso_13_06 <- flights |> 
+  filter(day==13 & month==6) |> 
+  group_by(dest) |> 
+  summarize(promedio_dest=mean(arr_delay,na.rm=TRUE)) |> 
+  arrange(desc(promedio_dest)) 
+
+mapa_13_06 <- airports |> 
+  left_join(retraso_13_06 , join_by(faa==dest)) |> 
+  ggplot(aes(x=lon,y=lat))+
+  borders("state")+
+  geom_point(aes(color=promedio_dest))+
+  coord_quickmap()
+
+mapa_13_06
+weather
+
+
+#Ese dia hubo fuertes tormentas en EEUU
